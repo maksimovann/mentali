@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Link, NavLink, Route, Routes, useNavigate } from 'react-router-dom'
+import { HashRouter, Link, NavLink, Route, Routes, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import './styles.css'
 
@@ -36,7 +36,7 @@ const demoAppointments = [
 
 function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Auth />} />
@@ -45,7 +45,7 @@ function App() {
         <Route path="/clients" element={<ClientsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Routes>
-    </BrowserRouter>
+    </HashRouter>
   )
 }
 
