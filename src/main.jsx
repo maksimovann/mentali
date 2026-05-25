@@ -6,7 +6,8 @@ import './styles.css'
 
 const api = {
   async request(path, options = {}) {
-    const response = await fetch(`http://localhost:3001${path}`, {
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    const response = await fetch(`${baseUrl}${path}`, {
       headers: { 'Content-Type': 'application/json' },
       ...options,
     })
