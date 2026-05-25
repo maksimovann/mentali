@@ -49,4 +49,3 @@ SQLite база создается автоматически в `server/data/me
 npm run build
 ```
 
-Проект учебный: без JWT, OAuth, ролей, оплаты и production-архитектуры.
