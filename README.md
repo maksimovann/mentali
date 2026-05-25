@@ -1,0 +1,52 @@
+# Mentali
+
+Учебный MVP web-платформы для психологов и специалистов помогающих практик.
+
+## Стек
+
+- React
+- Vite
+- Tailwind CSS
+- React Router
+- Framer Motion
+- Node.js
+- Express
+- SQLite через встроенный `node:sqlite`
+
+## Страницы
+
+- Главная страница с регистрацией
+- Авторизация
+- Dashboard
+- Календарь
+- Клиенты
+- Настройки
+
+## Запуск
+
+```bash
+npm install
+npm run dev
+```
+
+Открыть frontend:
+
+```text
+http://localhost:5173
+```
+
+Backend API:
+
+```text
+http://localhost:3001/api/health
+```
+
+SQLite база создается автоматически в `server/data/mentali.sqlite`.
+
+## Сборка frontend
+
+```bash
+npm run build
+```
+
+Проект учебный: без JWT, OAuth, ролей, оплаты и production-архитектуры.
