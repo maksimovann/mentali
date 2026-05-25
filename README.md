@@ -32,7 +32,7 @@ npm run dev
 Открыть frontend:
 
 ```text
-http://localhost:5173
+https://maksimovann.github.io/mentali
 ```
 
 Backend API:
