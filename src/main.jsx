@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+﻿import React, { useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { HashRouter, Link, NavLink, Route, Routes, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
@@ -6,14 +6,155 @@ import './styles.css'
 
 const api = {
   async request(path, options = {}) {
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
-    const response = await fetch(`${baseUrl}${path}`, {
-      headers: { 'Content-Type': 'application/json' },
-      ...options,
-    })
-    const data = await response.json().catch(() => ({}))
-    if (!response.ok) throw new Error(data.error || 'Ошибка запроса')
-    return data
+    const method = options.method || 'GET'
+    const body = options.body ? JSON.parse(options.body) : null
+    const db = readDemoDb()
+
+    if (method === 'POST' && path === '/api/register') {
+      if (!body.full_name || !body.email || !body.password || !body.specialization) {
+        throw new Error('Заполните все поля регистрации')
+      }
+
+      const specialist = {
+        id: Date.now(),
+        full_name: body.full_name,
+        email: body.email,
+        password: body.password,
+        specialization: body.specialization,
+        description: '',
+        personal_slug: uniqueSlug(body.full_name, db.specialists),
+        created_at: new Date().toISOString(),
+      }
+
+      db.specialists.push(specialist)
+      writeDemoDb(db)
+      return publicSpecialist(specialist)
+    }
+
+    if (method === 'POST' && path === '/api/login') {
+      const specialist = db.specialists.find((item) => item.email === body.email && item.password === body.password)
+      if (!specialist) throw new Error('Неверный email или пароль')
+      return publicSpecialist(specialist)
+    }
+
+    const specialistMatch = path.match(/^\/api\/specialists\/(\d+)(?:\/(.+))?$/)
+    if (specialistMatch) {
+      const specialistId = Number(specialistMatch[1])
+      const section = specialistMatch[2]
+      const specialist = db.specialists.find((item) => Number(item.id) === specialistId)
+      if (!specialist) throw new Error('Специалист не найден')
+
+      if (!section && method === 'GET') return publicSpecialist(specialist)
+
+      if (!section && method === 'PUT') {
+        Object.assign(specialist, {
+          full_name: body.full_name,
+          email: body.email,
+          specialization: body.specialization,
+          description: body.description || '',
+        })
+        writeDemoDb(db)
+        return publicSpecialist(specialist)
+      }
+
+      if (section === 'dashboard') {
+        const appointments = appointmentsFor(db, specialistId)
+        return {
+          specialist: publicSpecialist(specialist),
+          stats: {
+            clientsCount: db.clients.filter((item) => Number(item.specialist_id) === specialistId).length,
+            appointmentsCount: appointments.length,
+            servicesCount: db.services.filter((item) => Number(item.specialist_id) === specialistId).length,
+          },
+          upcoming: appointments.slice(0, 4),
+        }
+      }
+
+      if (section === 'appointments' && method === 'GET') return appointmentsFor(db, specialistId)
+
+      if (section === 'appointments' && method === 'POST') {
+        if (!body.client_name || !body.service_id || !body.appointment_date || !body.appointment_time) {
+          throw new Error('Заполните клиента, услугу, дату и время')
+        }
+
+        let client = db.clients.find((item) => (
+          Number(item.specialist_id) === specialistId &&
+          item.email &&
+          body.client_email &&
+          item.email.toLowerCase() === body.client_email.toLowerCase()
+        ))
+
+        if (!client) {
+          client = {
+            id: Date.now(),
+            specialist_id: specialistId,
+            full_name: body.client_name,
+            email: body.client_email || '',
+            phone: body.client_phone || '',
+            created_at: new Date().toISOString(),
+          }
+          db.clients.push(client)
+        }
+
+        db.appointments.push({
+          id: Date.now() + 1,
+          specialist_id: specialistId,
+          client_id: client.id,
+          service_id: Number(body.service_id),
+          appointment_date: body.appointment_date,
+          appointment_time: body.appointment_time,
+          status: body.status || 'Запланирована',
+          comment: body.comment || '',
+          created_at: new Date().toISOString(),
+        })
+        writeDemoDb(db)
+        return { ok: true }
+      }
+
+      if (section === 'clients') {
+        return db.clients
+          .filter((item) => Number(item.specialist_id) === specialistId)
+          .map((client) => ({
+            ...client,
+            appointments_count: db.appointments.filter((item) => Number(item.client_id) === Number(client.id)).length,
+          }))
+      }
+
+      if (section === 'services' && method === 'GET') {
+        return db.services.filter((item) => Number(item.specialist_id) === specialistId)
+      }
+
+      if (section === 'services' && method === 'POST') {
+        if (!body.title || !body.duration_minutes || !body.price || !body.format) {
+          throw new Error('Заполните название, длительность, стоимость и формат')
+        }
+
+        const service = {
+          id: Date.now(),
+          specialist_id: specialistId,
+          title: body.title,
+          description: body.description || '',
+          duration_minutes: Number(body.duration_minutes),
+          price: Number(body.price),
+          format: body.format,
+          created_at: new Date().toISOString(),
+        }
+        db.services.push(service)
+        writeDemoDb(db)
+        return service
+      }
+    }
+
+    const serviceDeleteMatch = path.match(/^\/api\/services\/(\d+)$/)
+    if (method === 'DELETE' && serviceDeleteMatch) {
+      const serviceId = Number(serviceDeleteMatch[1])
+      db.services = db.services.filter((item) => Number(item.id) !== serviceId)
+      db.appointments = db.appointments.filter((item) => Number(item.service_id) !== serviceId)
+      writeDemoDb(db)
+      return { ok: true }
+    }
+
+    return {}
   },
   get(path) {
     return this.request(path)
@@ -29,6 +170,73 @@ const api = {
   },
 }
 
+function readDemoDb() {
+  const emptyDb = { specialists: [], clients: [], services: [], appointments: [] }
+  try {
+    return JSON.parse(localStorage.getItem('mentali_demo_db')) || emptyDb
+  } catch {
+    return emptyDb
+  }
+}
+
+function writeDemoDb(db) {
+  localStorage.setItem('mentali_demo_db', JSON.stringify(db))
+}
+
+function publicSpecialist(specialist) {
+  const { password, ...publicData } = specialist
+  return publicData
+}
+
+function appointmentsFor(db, specialistId) {
+  return db.appointments
+    .filter((item) => Number(item.specialist_id) === specialistId)
+    .map((appointment) => {
+      const client = db.clients.find((item) => Number(item.id) === Number(appointment.client_id)) || {}
+      const service = db.services.find((item) => Number(item.id) === Number(appointment.service_id)) || {}
+      return {
+        ...appointment,
+        client_name: client.full_name || 'Клиент',
+        client_email: client.email || '',
+        client_phone: client.phone || '',
+        service_title: service.title || 'Услуга',
+        duration_minutes: service.duration_minutes || 60,
+        format: service.format || 'Онлайн',
+      }
+    })
+    .sort((a, b) => `${a.appointment_date} ${a.appointment_time}`.localeCompare(`${b.appointment_date} ${b.appointment_time}`))
+}
+
+function uniqueSlug(fullName, specialists) {
+  const base = slugify(fullName) || `specialist-${Date.now()}`
+  let slug = base
+  let index = 2
+
+  while (specialists.some((item) => item.personal_slug === slug)) {
+    slug = `${base}-${index}`
+    index += 1
+  }
+
+  return slug
+}
+
+function slugify(value) {
+  const map = {
+    а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z',
+    и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r',
+    с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'c', ч: 'ch', ш: 'sh',
+    щ: 'sch', ы: 'y', э: 'e', ю: 'yu', я: 'ya',
+  }
+
+  return value
+    .toLowerCase()
+    .split('')
+    .map((char) => map[char] || char)
+    .join('')
+    .replace(/ь|ъ/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
+}
 const demoAppointments = [
   { client_name: 'Екатерина Лебедева', appointment_time: '10:00', service_title: 'Первичная консультация', status: 'Подтверждена' },
   { client_name: 'Михаил Соколов', appointment_time: '13:30', service_title: 'Онлайн-сессия', status: 'Ожидает' },
@@ -576,3 +784,4 @@ function DashboardPreview() {
 }
 
 createRoot(document.getElementById('root')).render(<App />)
+

@@ -43,6 +43,11 @@ http://localhost:3001/api/health
 
 SQLite база создается автоматически в `server/data/mentali.sqlite`.
 
+## GitHub Pages
+
+На GitHub Pages проект работает в demo-режиме без backend API.
+Регистрация, вход, клиенты, услуги и записи сохраняются в `localStorage` браузера.
+
 ## Сборка frontend
 
 ```bash
