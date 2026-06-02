@@ -41,7 +41,6 @@ Backend API:
 http://localhost:3001/api/health
 ```
 
-SQLite база создается автоматически в `server/data/mentali.sqlite`.
 
 ## GitHub Pages
 
